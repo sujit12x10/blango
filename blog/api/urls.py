@@ -30,6 +30,11 @@ urlpatterns = [
     path("users/<str:email>", UserDetail.as_view(), name="api_user_detail"),
     path("auth/", include("rest_framework.urls")),
     path("", include(router.urls)),
+    path(
+    "posts/by-time/<str:period_name>/",
+    PostViewSet.as_view({"get": "list"}),
+    name="posts-by-time",
+    ),
     path("token-auth/", views.obtain_auth_token),
 
     re_path(
