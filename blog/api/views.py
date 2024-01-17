@@ -20,6 +20,8 @@ from django.utils import timezone
 from datetime import timedelta
 from django.http import Http404
 
+from blog.api.filters import PostFilterSet
+
 #class PostList(generics.ListCreateAPIView):
 #    queryset = Post.objects.all()
 #    serializer_class = PostSerializer
@@ -46,9 +48,14 @@ class TagViewSet(viewsets.ModelViewSet):
     @action(methods=["get"], detail=True, name="Posts with the Tag")
     def posts(self, request, pk=None):
         tag = self.get_object()
-        post_serializer = PostSerializer(
-            tag.posts, many=True, context={"request": request}
-        )
+        tag_posts = Post.objects.filter(tags=tag)
+        page = self.paginate_queryset(tag_posts)
+        if page is not None:
+            post_serializer = PostSerializer(
+                page, many=True, context={"request": request}
+            )
+            return self.get_paginated_response(post_serializer.data)
+        post_serializer = PostSerializer(tag.posts, many=True, context={"request":request})
         return Response(post_serializer.data)
 
     @method_decorator(cache_page(300))
@@ -62,6 +69,8 @@ class TagViewSet(viewsets.ModelViewSet):
 
 
 class PostViewSet(viewsets.ModelViewSet):
+    ordering_fields = ["published_at", "author", "title", "slug"]
+    filterset_class = PostFilterSet
     permission_classes = [AuthorModifyOrReadOnly | IsAdminUserForObject]
     queryset = Post.objects.all()
 
@@ -118,5 +127,12 @@ class PostViewSet(viewsets.ModelViewSet):
         if request.user.is_anonymous:
             raise PermissionDenied("You must be logged in to see which Posts are yours")
         posts = self.get_queryset().filter(author=request.user)
+
+        page = self.paginate_queryset(posts)
+
+        if page is not None:
+            serializer = PostSerializer(page, many=True, context={"request": request})
+            return self.get_paginated_response(serializer.data)
+
         serializer = PostSerializer(posts, many=True, context={"request": request})
         return Response(serializer.data)
